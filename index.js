@@ -20,7 +20,6 @@ async function main() {
   log("info", `=== OmeFree Promo Bot ===`);
   log("info", `Target: omegleweb.com | Promoting: ${config.appUrl}`);
   log("info", `Sessions: ${config.maxConcurrentSessions}`);
-  log("info", `Interests: ${config.interests.join(", ") || "none"}`);
   log("info", "");
 
   for (let i = 0; i < config.maxConcurrentSessions; i++) {

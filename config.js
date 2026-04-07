@@ -37,9 +37,6 @@ module.exports = {
   delayBeforeNextMs: 1500,
   pingIntervalMs: 20000,
 
-  // Interests (optional - helps match with relevant people)
-  interests: ["chat", "friends", "bored", "talk"],
-
   // Proxy configuration (iproyal or geonode)
   proxy: {
     enabled: envBool("PROXY_ENABLED", true),

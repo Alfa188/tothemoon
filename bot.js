@@ -257,9 +257,6 @@ class OmegleBot {
   findPartner() {
     this.seq++;
     const prefs = {};
-    if (config.interests && config.interests.length) {
-      prefs.interests = config.interests;
-    }
     this.send({
       type: "find_partner",
       seq: this.seq,
@@ -275,9 +272,6 @@ class OmegleBot {
   nextPartner() {
     this.seq++;
     const prefs = {};
-    if (config.interests && config.interests.length) {
-      prefs.interests = config.interests;
-    }
     // Free the matchId from the shared registry before moving on
     if (this.matchId) activeMatchIds.delete(this.matchId);
     this.send({
