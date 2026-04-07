@@ -8,18 +8,6 @@ const { generateDeviceId, randomDelay, sleep, log } = require("./utils");
 // Proactively detects bot-to-bot matches before any message is sent
 const activeMatchIds = new Set();
 
-// Max consecutive reconnect failures before giving up
-// High value needed because rotating proxies may give several flagged IPs in a row
-const MAX_RECONNECT_ATTEMPTS = 50;
-
-// Periodic cleanup of stale matchIds (safety against memory leaks)
-setInterval(() => {
-  if (activeMatchIds.size > 500) {
-    log("warn", `activeMatchIds cleanup: ${activeMatchIds.size} entries — clearing stale`);
-    activeMatchIds.clear();
-  }
-}, 60000);
-
 class OmegleBot {
   constructor(sessionId = 1) {
     this.sessionId = sessionId;
@@ -35,7 +23,6 @@ class OmegleBot {
     this.reconnectAttempts = 0;
     this.vpnBlockedCount = 0;
     this.stats = { sessions: 0, messagesDelivered: 0, errors: 0 };
-    this.strangerReplied = false;
   }
 
   // Build the WebSocket URL matching the real client
@@ -45,39 +32,28 @@ class OmegleBot {
       did: this.deviceId,
       dc: "desktop",
       sb: "lg",
-      tz: "Europe/Paris",
-      net: "4g",
-      wv: "Google Inc. (NVIDIA)",
-      wr: "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 SUPER Direct3D11 vs_5_0 ps_5_0, D3D11)",
     });
     return `${config.wsUrl}?${params.toString()}`;
   }
 
-  // Build proxy agent — supports IPRoyal and Geonode via PROXY_PROVIDER env var
-  // IPRoyal: user:pass_country-XX_session-Y_lifetime-Z@geo.iproyal.com:12321
-  // Geonode: user[-country-XX]:pass@proxy.geonode.io:9010 (no sticky on premium port)
+  // Build IPRoyal proxy agent
   buildProxyAgent() {
     const p = config.proxy;
     if (!p || !p.enabled) return null;
 
-    let user, pass;
-    if (p.provider === "iproyal") {
-      user = p.username;
-      pass = p.password;
-      if (p.country) pass += `_country-${p.country}`;
-      if (p.sticky) {
-        const sessId = `bot${this.sessionId}${this.deviceId.slice(0, 6)}`;
-        pass += `_session-${sessId}_lifetime-${p.stickyLifetime || "10m"}`;
-      }
-    } else {
-      // Geonode (default) — port 9010 premium residential, no sticky support
-      user = p.username;
-      if (p.country) user += `-country-${p.country}`;
-      pass = p.password;
+    // IPRoyal uses password suffixes for options
+    // Format: password_country-XX_session-XXXX_lifetime-30m
+    let pass = p.password;
+    if (p.country) pass += `_country-${p.country}`;
+    if (p.sticky) {
+      // Generate a unique session ID per bot instance for sticky IP
+      const sessId = `bot${this.sessionId}_${this.deviceId.slice(0, 8)}`;
+      pass += `_session-${sessId}`;
+      if (p.stickyLifetime) pass += `_lifetime-${p.stickyLifetime}`;
     }
 
-    const proxyUrl = `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${p.host}:${p.port}`;
-    log("info", `[S${this.sessionId}] Using proxy: ${p.provider || "geonode"} ${p.host}:${p.port}${p.country ? ` (${p.country})` : ""}`);
+    const proxyUrl = `http://${encodeURIComponent(p.username)}:${encodeURIComponent(pass)}@${p.host}:${p.port}`;
+    log("info", `[S${this.sessionId}] Using proxy: ${p.host}:${p.port}${p.country ? ` (${p.country})` : ""}`);
     return new HttpsProxyAgent(proxyUrl);
   }
 
@@ -119,10 +95,6 @@ class OmegleBot {
           Origin: "https://omegleweb.com",
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-          "Accept-Language": "en-US,en;q=0.9",
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-          Cookie: `omegle_device_id_v1=${this.deviceId}`,
         },
       };
 
@@ -173,10 +145,7 @@ class OmegleBot {
     }
     if (!msg || !msg.type) return;
 
-    // Skip debug logging for high-frequency messages (stats ~50/s, pong)
-    if (msg.type !== "stats" && msg.type !== "pong") {
-      log("debug", `[S${this.sessionId}] ← ${msg.type}`, JSON.stringify(msg).slice(0, 200));
-    }
+    log("debug", `[S${this.sessionId}] ← ${msg.type}`, JSON.stringify(msg).slice(0, 200));
 
     switch (msg.type) {
       case "pong":
@@ -187,7 +156,7 @@ class OmegleBot {
         break;
 
       case "stats":
-        if (!this._lastOnlineLog || Date.now() - this._lastOnlineLog > 30000) {
+        if (!this._lastOnlineLog || Date.now() - this._lastOnlineLog > 10000) {
           log("info", `[S${this.sessionId}] Online: ${msg.online}`);
           this._lastOnlineLog = Date.now();
         }
@@ -212,7 +181,6 @@ class OmegleBot {
         this.vpnBlockedCount = 0; // IP works — reset vpn counter
         this.reconnectAttempts = 0;
         this.stats.sessions++;
-        this.strangerReplied = false;
         log("info", `[S${this.sessionId}] Matched! (matchId: ${msg.matchId}, country: ${msg.partnerCountryCode || "?"})`);
         this.runConversation();
         break;
@@ -228,7 +196,6 @@ class OmegleBot {
       case "chat_message":
         if (msg.from !== "you") {
           log("info", `[S${this.sessionId}] Stranger: ${msg.text}`);
-          this.strangerReplied = true;
           // Bot-to-bot detection: if stranger sends our promo, skip with delay
           if (msg.text && msg.text.includes(config.appUrl)) {
             log("warn", `[S${this.sessionId}] Bot-to-bot match detected — skipping with delay`);
@@ -245,9 +212,8 @@ class OmegleBot {
         this.stats.errors++;
         if (msg.code === "vpn_blocked") {
           this.vpnBlockedCount++;
-          // Rotating proxy = new IP each time, so retry quickly (5s) with jitter
-          const vpnBackoff = randomDelay(3000, 8000);
-          log("warn", `[S${this.sessionId}] IP blocked (${this.vpnBlockedCount}x) — new IP in ${Math.round(vpnBackoff / 1000)}s`);
+          const vpnBackoff = Math.min(30000 * Math.pow(2, this.vpnBlockedCount - 1), 300000);
+          log("warn", `[S${this.sessionId}] Proxy IP blocked (${this.vpnBlockedCount}x) — will reconnect with new IP in ${Math.round(vpnBackoff / 1000)}s`);
           this.needsReconnect = true;
           this._vpnBackoff = vpnBackoff;
           // Force close WS so reconnect logic kicks in
@@ -283,57 +249,63 @@ class OmegleBot {
   // Search for a partner
   findPartner() {
     this.seq++;
-    this.send({ type: "find_partner", seq: this.seq, bucket: config.bucket, chatType: config.chatType, prefs: {} });
+    const prefs = {};
+    if (config.interests && config.interests.length) {
+      prefs.interests = config.interests;
+    }
+    this.send({
+      type: "find_partner",
+      seq: this.seq,
+      bucket: config.bucket,
+      chatType: config.chatType,
+      prefs,
+    });
     this.isSearching = true;
     log("info", `[S${this.sessionId}] Searching for partner...`);
   }
 
   // Skip to next partner
   nextPartner() {
-    if (this.matchId) activeMatchIds.delete(this.matchId);
     this.seq++;
-    this.send({ type: "next", seq: this.seq, bucket: config.bucket, chatType: config.chatType, prefs: {} });
+    const prefs = {};
+    if (config.interests && config.interests.length) {
+      prefs.interests = config.interests;
+    }
+    // Free the matchId from the shared registry before moving on
+    if (this.matchId) activeMatchIds.delete(this.matchId);
+    this.send({
+      type: "next",
+      seq: this.seq,
+      bucket: config.bucket,
+      chatType: config.chatType,
+      prefs,
+    });
     this.matchId = null;
     this.conversationActive = false;
     this.isSearching = true;
     log("info", `[S${this.sessionId}] Skipping to next partner...`);
   }
 
-  // Send a chat message with human-like typing simulation
+  // Send a chat message with typing simulation
   async sendMessage(text) {
     if (!this.matchId || !this.conversationActive) return false;
 
-    // Brief pre-typing pause (reading what was said, thinking)
-    await sleep(randomDelay(400, 1800));
-    if (!this.matchId || !this.conversationActive) return false;
-
-    // Start typing indicator
+    // Send typing indicator
     this.send({ type: "typing", matchId: this.matchId, isTyping: true });
 
-    // Human typing speed: ~35-65 WPM = 180-350ms/word, with variation within message
-    const words = text.trim().split(/\s+/).length;
-    const msPerWord = randomDelay(180, 380);
-    let typingMs = words * msPerWord;
-
-    // Add mid-message "thinking" pauses for longer messages
-    if (words > 6) {
-      const extraPauses = Math.floor(words / 6);
-      typingMs += extraPauses * randomDelay(300, 900);
-    }
-
-    // Clamp between 1.2s and 7s
-    typingMs = Math.min(Math.max(typingMs, 1200), 7000);
-    await sleep(typingMs);
+    // Simulate typing time based on message length
+    const typingTime = Math.min(
+      config.typingIndicatorDelay + text.length * 40,
+      4000
+    );
+    await sleep(typingTime);
 
     if (!this.matchId || !this.conversationActive) return false;
 
     // Stop typing indicator
     this.send({ type: "typing", matchId: this.matchId, isTyping: false });
 
-    // Tiny pause between stopping typing and sending (feels natural)
-    await sleep(randomDelay(50, 250));
-    if (!this.matchId || !this.conversationActive) return false;
-
+    // Send the actual message
     this.send({ type: "chat_message", matchId: this.matchId, text });
     this.stats.messagesDelivered++;
     log("info", `[S${this.sessionId}] You: ${text}`);
@@ -342,39 +314,39 @@ class OmegleBot {
 
   // Run a conversation sequence
   async runConversation() {
-    const [greeting, promo] = getRandomSequence();
+    const sequence = getRandomSequence();
 
-    // Variable initial reaction delay (human takes a moment to notice the match)
-    await sleep(randomDelay(1500, 4500));
+    // Wait 3 seconds after match before sending anything
+    await sleep(3000);
     if (!this.matchId || !this.conversationActive) return;
 
-    // Send greeting
-    const greetSent = await this.sendMessage(greeting);
-    if (!greetSent) return;
+    for (let i = 0; i < sequence.length; i++) {
+      if (!this.matchId || !this.conversationActive) {
+        log("info", `[S${this.sessionId}] Partner left mid-conversation`);
+        return;
+      }
 
-    // Wait for stranger's response — wide variable window like a real person
-    this.strangerReplied = false;
-    const responseWait = randomDelay(6000, 16000);
-    await sleep(responseWait);
-    if (!this.matchId || !this.conversationActive) return;
+      // Random delay between messages
+      if (i > 0) {
+        const delay = randomDelay(config.minDelayBetweenMsgs, config.maxDelayBetweenMsgs);
+        await sleep(delay);
+      }
 
-    // If they replied, pause to "read" their message before responding
-    if (this.strangerReplied) {
-      await sleep(randomDelay(1200, 3500));
+      // Check again after delay
       if (!this.matchId || !this.conversationActive) return;
+
+      const sent = await this.sendMessage(sequence[i]);
+      if (!sent) return;
+
+      // After the first message, wait a bit for a response
+      if (i === 0) {
+        await sleep(config.waitForResponseMs);
+        if (!this.matchId || !this.conversationActive) return;
+      }
     }
 
-    // Send promo
-    const promoSent = await this.sendMessage(promo);
-    if (!promoSent) return;
-
-    // Linger naturally if they were engaged
-    if (this.strangerReplied) {
-      await sleep(randomDelay(4000, 9000));
-    }
-
-    // Brief pause before skipping
-    await sleep(randomDelay(800, 2000));
+    // Conversation done, wait a moment then move to next
+    await sleep(config.delayBeforeNextMs);
     if (this.matchId && this.conversationActive) {
       this.nextPartner();
     }
@@ -383,12 +355,6 @@ class OmegleBot {
   // Reconnect after a disconnect
   async reconnect() {
     this.reconnectAttempts++;
-
-    if (this.reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
-      log("error", `[S${this.sessionId}] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached — stopping bot`);
-      this.isClosed = true;
-      return false;
-    }
 
     // Use vpn-specific backoff if we got vpn_blocked, otherwise normal backoff
     const backoff = this._vpnBackoff || Math.min(5000 * this.reconnectAttempts, 30000);
@@ -430,8 +396,8 @@ class OmegleBot {
       return;
     }
 
-    // Wait for session to be established before searching
-    await sleep(2000);
+    // Wait for session to be established
+    await sleep(1500);
 
     // Start first search
     this.findPartner();
