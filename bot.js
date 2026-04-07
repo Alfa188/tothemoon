@@ -9,7 +9,8 @@ const { generateDeviceId, randomDelay, sleep, log } = require("./utils");
 const activeMatchIds = new Set();
 
 // Max consecutive reconnect failures before giving up
-const MAX_RECONNECT_ATTEMPTS = 15;
+// High value needed because rotating proxies may give several flagged IPs in a row
+const MAX_RECONNECT_ATTEMPTS = 50;
 
 // Periodic cleanup of stale matchIds (safety against memory leaks)
 setInterval(() => {
@@ -172,7 +173,10 @@ class OmegleBot {
     }
     if (!msg || !msg.type) return;
 
-    log("debug", `[S${this.sessionId}] ← ${msg.type}`, JSON.stringify(msg).slice(0, 200));
+    // Skip debug logging for high-frequency messages (stats ~50/s, pong)
+    if (msg.type !== "stats" && msg.type !== "pong") {
+      log("debug", `[S${this.sessionId}] ← ${msg.type}`, JSON.stringify(msg).slice(0, 200));
+    }
 
     switch (msg.type) {
       case "pong":
@@ -183,7 +187,7 @@ class OmegleBot {
         break;
 
       case "stats":
-        if (!this._lastOnlineLog || Date.now() - this._lastOnlineLog > 10000) {
+        if (!this._lastOnlineLog || Date.now() - this._lastOnlineLog > 30000) {
           log("info", `[S${this.sessionId}] Online: ${msg.online}`);
           this._lastOnlineLog = Date.now();
         }
@@ -241,8 +245,9 @@ class OmegleBot {
         this.stats.errors++;
         if (msg.code === "vpn_blocked") {
           this.vpnBlockedCount++;
-          const vpnBackoff = Math.min(30000 * Math.pow(2, this.vpnBlockedCount - 1), 300000);
-          log("warn", `[S${this.sessionId}] Proxy IP blocked (${this.vpnBlockedCount}x) — will reconnect with new IP in ${Math.round(vpnBackoff / 1000)}s`);
+          // Rotating proxy = new IP each time, so retry quickly (5s) with jitter
+          const vpnBackoff = randomDelay(3000, 8000);
+          log("warn", `[S${this.sessionId}] IP blocked (${this.vpnBlockedCount}x) — new IP in ${Math.round(vpnBackoff / 1000)}s`);
           this.needsReconnect = true;
           this._vpnBackoff = vpnBackoff;
           // Force close WS so reconnect logic kicks in
@@ -421,8 +426,8 @@ class OmegleBot {
       return;
     }
 
-    // Wait for session to be established
-    await sleep(1500);
+    // Wait for session to be established before searching
+    await sleep(2000);
 
     // Start first search
     this.findPartner();
