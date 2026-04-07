@@ -45,6 +45,7 @@ class OmegleBot {
       dc: "desktop",
       sb: "lg",
       tz: "Europe/Paris",
+      net: "4g",
       wv: "Google Inc. (NVIDIA)",
       wr: "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 SUPER Direct3D11 vs_5_0 ps_5_0, D3D11)",
     });
@@ -53,7 +54,7 @@ class OmegleBot {
 
   // Build proxy agent — supports IPRoyal and Geonode via PROXY_PROVIDER env var
   // IPRoyal: user:pass_country-XX_session-Y_lifetime-Z@geo.iproyal.com:12321
-  // Geonode:  user-type-residential[-country-XX]:pass@proxy.geonode.io:9000
+  // Geonode:  user[-country-XX][-session-ID]:pass@proxy.geonode.io:9000
   buildProxyAgent() {
     const p = config.proxy;
     if (!p || !p.enabled) return null;
@@ -68,9 +69,13 @@ class OmegleBot {
         pass += `_session-${sessId}_lifetime-${p.stickyLifetime || "10m"}`;
       }
     } else {
-      // Geonode (default)
-      user = `${p.username}-type-${p.type || "residential"}`;
+      // Geonode (default) — port 9000 is already residential, no -type- needed
+      user = p.username;
       if (p.country) user += `-country-${p.country}`;
+      if (p.sticky) {
+        const sessId = `s${this.sessionId}${this.deviceId.slice(0, 8)}`;
+        user += `-session-${sessId}`;
+      }
       pass = p.password;
     }
 
@@ -117,6 +122,10 @@ class OmegleBot {
           Origin: "https://omegleweb.com",
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+          Cookie: `omegle_device_id_v1=${this.deviceId}`,
         },
       };
 
