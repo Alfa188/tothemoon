@@ -1,3 +1,21 @@
+// Load .env file if present
+require("dotenv").config();
+
+function env(key, fallback) {
+  return process.env[key] !== undefined ? process.env[key] : fallback;
+}
+
+function envBool(key, fallback) {
+  const v = process.env[key];
+  if (v === undefined) return fallback;
+  return v === "true" || v === "1";
+}
+
+function envInt(key, fallback) {
+  const v = process.env[key];
+  return v !== undefined ? parseInt(v, 10) : fallback;
+}
+
 module.exports = {
   // Target platform
   wsUrl: "wss://omegleweb.com/ws",
@@ -10,37 +28,32 @@ module.exports = {
   appUrl: "omefree.com",
 
   // Bot behavior
-  maxConcurrentSessions: 30,      // Number of parallel bot sessions
-  minDelayBetweenMsgs: 1500,      // Min ms between messages (simulates typing)
-  maxDelayBetweenMsgs: 3500,      // Max ms between messages
-  typingIndicatorDelay: 800,       // ms to show typing before sending
-  waitForResponseMs: 8000,         // How long to wait for stranger reply before moving on
-  delayBeforePromoMs: 2000,        // Delay after greeting before promo message
-  delayBeforeNextMs: 1500,         // Delay after promo before skipping to next
-  pingIntervalMs: 20000,           // Heartbeat interval (match the real client)
+  maxConcurrentSessions: envInt("MAX_CONCURRENT_SESSIONS", 30),
+  minDelayBetweenMsgs: 1500,
+  maxDelayBetweenMsgs: 3500,
+  typingIndicatorDelay: 800,
+  waitForResponseMs: 8000,
+  delayBeforePromoMs: 2000,
+  delayBeforeNextMs: 1500,
+  pingIntervalMs: 20000,
 
   // Interests (optional - helps match with relevant people)
   interests: ["chat", "friends", "bored", "talk"],
 
-  // IPRoyal Residential Proxy
-  // Docs: https://dashboard.iproyal.com/residential-proxies
+  // Geonode Residential Proxy (credentials from .env)
+  // Docs: https://app.geonode.com/proxies
   proxy: {
-    enabled: true,
-    // Format: http://username:password@host:port
-    // IPRoyal residential endpoint
-    host: "geo.iproyal.com",
-    port: 12321,
-    username: "PROXY_USERNAME_REDACTED",
-    password: "PROXY_PASSWORD_REDACTED",
-    // IPRoyal params appended to password: country, session, lifetime
-    // country: target country code (e.g. "us", "fr", "gb", "de")
-    // session: random string for sticky session (same IP for duration)
-    // lifetime: sticky session duration in minutes (e.g. "10m", "30m")
-    country: "",           // Leave empty for random worldwide
-    sticky: true,           // Use sticky sessions (same IP per bot session)
-    stickyLifetime: "2h",   // How long to keep the same IP
+    enabled: envBool("PROXY_ENABLED", true),
+    host: env("PROXY_HOST", "proxy.geonode.io"),
+    port: envInt("PROXY_PORT", 9000),
+    username: env("PROXY_USERNAME", ""),
+    password: env("PROXY_PASSWORD", ""),
+    type: env("PROXY_TYPE", "residential"),
+    country: env("PROXY_COUNTRY", ""),
+    sticky: envBool("PROXY_STICKY", true),
+    stickyLifetime: env("PROXY_STICKY_LIFETIME", "10m"),
   },
 
   // Logging
-  logLevel: "info", // "debug" | "info" | "warn" | "error"
+  logLevel: env("LOG_LEVEL", "info"),
 };

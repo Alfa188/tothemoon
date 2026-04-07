@@ -20,10 +20,8 @@
   },
   "homepage": "https://github.com/Alfa188/tothemoon#readme",
   "dependencies": {
+    "dotenv": "^16.0.0",
     "https-proxy-agent": "^9.0.0",
-    "puppeteer": "^24.40.0",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "ws": "^8.20.0"
   }
 }

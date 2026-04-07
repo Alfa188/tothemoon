@@ -13,9 +13,15 @@ npm install -g pm2
 
 echo "=== Cloning project ==="
 cd /opt
-git clone https://github.com/VOTRE_REPO/tothemoon.git || true
+git clone https://github.com/Alfa188/tothemoon.git || true
 cd tothemoon
 npm install
+
+echo "=== Setting up environment ==="
+if [ ! -f .env ]; then
+  cp .env.example .env
+  echo "⚠️  Edit /opt/tothemoon/.env with your Geonode credentials before starting!"
+fi
 
 echo "=== Starting bot with PM2 ==="
 pm2 start index.js --name "tothemoon" --max-memory-restart 512M

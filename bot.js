@@ -8,6 +8,17 @@ const { generateDeviceId, randomDelay, sleep, log } = require("./utils");
 // Proactively detects bot-to-bot matches before any message is sent
 const activeMatchIds = new Set();
 
+// Max consecutive reconnect failures before giving up
+const MAX_RECONNECT_ATTEMPTS = 15;
+
+// Periodic cleanup of stale matchIds (safety against memory leaks)
+setInterval(() => {
+  if (activeMatchIds.size > 500) {
+    log("warn", `activeMatchIds cleanup: ${activeMatchIds.size} entries — clearing stale`);
+    activeMatchIds.clear();
+  }
+}, 60000);
+
 class OmegleBot {
   constructor(sessionId = 1) {
     this.sessionId = sessionId;
@@ -23,6 +34,7 @@ class OmegleBot {
     this.reconnectAttempts = 0;
     this.vpnBlockedCount = 0;
     this.stats = { sessions: 0, messagesDelivered: 0, errors: 0 };
+    this.strangerReplied = false;
   }
 
   // Build the WebSocket URL matching the real client
@@ -36,23 +48,21 @@ class OmegleBot {
     return `${config.wsUrl}?${params.toString()}`;
   }
 
-  // Build IPRoyal proxy agent
+  // Build Geonode proxy agent
+  // Format: username-type-TYPE[-country-XX][-session-ID][-lifetime-Xm]:password
   buildProxyAgent() {
     const p = config.proxy;
     if (!p || !p.enabled) return null;
 
-    // IPRoyal uses password suffixes for options
-    // Format: password_country-XX_session-XXXX_lifetime-30m
-    let pass = p.password;
-    if (p.country) pass += `_country-${p.country}`;
+    let user = `${p.username}-type-${p.type || "residential"}`;
+    if (p.country) user += `-country-${p.country}`;
     if (p.sticky) {
-      // Generate a unique session ID per bot instance for sticky IP
-      const sessId = `bot${this.sessionId}_${this.deviceId.slice(0, 8)}`;
-      pass += `_session-${sessId}`;
-      if (p.stickyLifetime) pass += `_lifetime-${p.stickyLifetime}`;
+      const sessId = `bot${this.sessionId}${this.deviceId.slice(0, 6)}`;
+      user += `-session-${sessId}`;
+      if (p.stickyLifetime) user += `-lifetime-${p.stickyLifetime}`;
     }
 
-    const proxyUrl = `http://${encodeURIComponent(p.username)}:${encodeURIComponent(pass)}@${p.host}:${p.port}`;
+    const proxyUrl = `http://${encodeURIComponent(user)}:${encodeURIComponent(p.password)}@${p.host}:${p.port}`;
     log("info", `[S${this.sessionId}] Using proxy: ${p.host}:${p.port}${p.country ? ` (${p.country})` : ""}`);
     return new HttpsProxyAgent(proxyUrl);
   }
@@ -181,6 +191,7 @@ class OmegleBot {
         this.vpnBlockedCount = 0; // IP works — reset vpn counter
         this.reconnectAttempts = 0;
         this.stats.sessions++;
+        this.strangerReplied = false;
         log("info", `[S${this.sessionId}] Matched! (matchId: ${msg.matchId}, country: ${msg.partnerCountryCode || "?"})`);
         this.runConversation();
         break;
@@ -196,6 +207,7 @@ class OmegleBot {
       case "chat_message":
         if (msg.from !== "you") {
           log("info", `[S${this.sessionId}] Stranger: ${msg.text}`);
+          this.strangerReplied = true;
           // Bot-to-bot detection: if stranger sends our promo, skip with delay
           if (msg.text && msg.text.includes(config.appUrl)) {
             log("warn", `[S${this.sessionId}] Bot-to-bot match detected — skipping with delay`);
@@ -338,11 +350,22 @@ class OmegleBot {
       const sent = await this.sendMessage(sequence[i]);
       if (!sent) return;
 
-      // After the first message, wait a bit for a response
+      // After the first message (greeting), wait for a response
       if (i === 0) {
+        this.strangerReplied = false;
         await sleep(config.waitForResponseMs);
         if (!this.matchId || !this.conversationActive) return;
+        // If stranger replied, add a natural extra pause before promo
+        if (this.strangerReplied) {
+          await sleep(randomDelay(config.delayBeforePromoMs, config.delayBeforePromoMs + 2000));
+          if (!this.matchId || !this.conversationActive) return;
+        }
       }
+    }
+
+    // Linger a bit if stranger was engaged
+    if (this.strangerReplied) {
+      await sleep(randomDelay(3000, 5000));
     }
 
     // Conversation done, wait a moment then move to next
@@ -355,6 +378,12 @@ class OmegleBot {
   // Reconnect after a disconnect
   async reconnect() {
     this.reconnectAttempts++;
+
+    if (this.reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+      log("error", `[S${this.sessionId}] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached — stopping bot`);
+      this.isClosed = true;
+      return false;
+    }
 
     // Use vpn-specific backoff if we got vpn_blocked, otherwise normal backoff
     const backoff = this._vpnBackoff || Math.min(5000 * this.reconnectAttempts, 30000);
