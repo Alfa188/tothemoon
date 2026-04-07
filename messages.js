@@ -5,6 +5,8 @@
 const promoMessages = [
   "everyone here is male lol.. omefree.com has way more girls just saying",
   "omefree.com > this 😭",
+  "ngl omefree.com is way better for actually meeting people",
+  "this site is dead rn.. omefree.com is where everyone moved to",
 ];
 
 function getRandomPromo() {
