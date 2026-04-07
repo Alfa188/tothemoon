@@ -54,7 +54,7 @@ class OmegleBot {
 
   // Build proxy agent — supports IPRoyal and Geonode via PROXY_PROVIDER env var
   // IPRoyal: user:pass_country-XX_session-Y_lifetime-Z@geo.iproyal.com:12321
-  // Geonode:  user[-country-XX][-session-ID]:pass@proxy.geonode.io:9000
+  // Geonode: user[-country-XX]:pass@proxy.geonode.io:9010 (no sticky on premium port)
   buildProxyAgent() {
     const p = config.proxy;
     if (!p || !p.enabled) return null;
@@ -69,13 +69,9 @@ class OmegleBot {
         pass += `_session-${sessId}_lifetime-${p.stickyLifetime || "10m"}`;
       }
     } else {
-      // Geonode (default) — port 9000 is already residential, no -type- needed
+      // Geonode (default) — port 9010 premium residential, no sticky support
       user = p.username;
       if (p.country) user += `-country-${p.country}`;
-      if (p.sticky) {
-        const sessId = `s${this.sessionId}${this.deviceId.slice(0, 8)}`;
-        user += `-session-${sessId}`;
-      }
       pass = p.password;
     }
 
