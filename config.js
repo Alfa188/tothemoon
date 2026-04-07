@@ -37,9 +37,6 @@ module.exports = {
   delayBeforeNextMs: 1500,
   pingIntervalMs: 20000,
 
-  // Interests (optional - helps match with relevant people)
-  interests: ["chat", "friends", "bored", "talk"],
-
   // Geonode Residential Proxy (credentials from .env)
   // Proxy config — set PROXY_PROVIDER=iproyal or geonode
   proxy: {

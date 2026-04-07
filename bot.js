@@ -269,32 +269,15 @@ class OmegleBot {
 
   // Search for a partner
   findPartner() {
-    const msg = {
-      type: "search",
-      chatType: config.chatType,
-      bucket: config.bucket,
-    };
-    if (config.interests && config.interests.length) {
-      msg.interests = config.interests;
-    }
-    this.send(msg);
+    this.send({ type: "search", chatType: config.chatType, bucket: config.bucket });
     this.isSearching = true;
     log("info", `[S${this.sessionId}] Searching for partner...`);
   }
 
   // Skip to next partner
   nextPartner() {
-    // Free the matchId from the shared registry before moving on
     if (this.matchId) activeMatchIds.delete(this.matchId);
-    const msg = {
-      type: "search",
-      chatType: config.chatType,
-      bucket: config.bucket,
-    };
-    if (config.interests && config.interests.length) {
-      msg.interests = config.interests;
-    }
-    this.send(msg);
+    this.send({ type: "search", chatType: config.chatType, bucket: config.bucket });
     this.matchId = null;
     this.conversationActive = false;
     this.isSearching = true;
