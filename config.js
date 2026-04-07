@@ -35,14 +35,14 @@ module.exports = {
   // Proxy config — set PROXY_PROVIDER=iproyal or geonode
   proxy: {
     enabled: envBool("PROXY_ENABLED", true),
-    provider: env("PROXY_PROVIDER", "geonode"),
-    host: env("PROXY_HOST", "proxy.geonode.io"),
-    port: envInt("PROXY_PORT", 9010),
+    provider: env("PROXY_PROVIDER", "iproyal"),
+    host: env("PROXY_HOST", "geo.iproyal.com"),
+    port: envInt("PROXY_PORT", 12321),
     username: env("PROXY_USERNAME", ""),
     password: env("PROXY_PASSWORD", ""),
     type: env("PROXY_TYPE", "residential"),
     country: env("PROXY_COUNTRY", ""),
-    sticky: envBool("PROXY_STICKY", false),
+    sticky: envBool("PROXY_STICKY", true),
     stickyLifetime: env("PROXY_STICKY_LIFETIME", "10m"),
   },
 
