@@ -49,18 +49,15 @@ class OmegleBot {
   }
 
   // Build Geonode proxy agent
-  // Format: username-type-TYPE[-country-XX][-session-ID][-lifetime-Xm]:password
+  // Format: username-type-TYPE[-country-XX]:password
+  // Note: session/lifetime params are NOT supported by Geonode in the username.
+  // Sticky IPs are not needed since each bot uses a single long-lived WebSocket connection.
   buildProxyAgent() {
     const p = config.proxy;
     if (!p || !p.enabled) return null;
 
     let user = `${p.username}-type-${p.type || "residential"}`;
     if (p.country) user += `-country-${p.country}`;
-    if (p.sticky) {
-      const sessId = `bot${this.sessionId}${this.deviceId.slice(0, 6)}`;
-      user += `-session-${sessId}`;
-      if (p.stickyLifetime) user += `-lifetime-${p.stickyLifetime}`;
-    }
 
     const proxyUrl = `http://${encodeURIComponent(user)}:${encodeURIComponent(p.password)}@${p.host}:${p.port}`;
     log("info", `[S${this.sessionId}] Using proxy: ${p.host}:${p.port}${p.country ? ` (${p.country})` : ""}`);
