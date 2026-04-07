@@ -44,6 +44,9 @@ class OmegleBot {
       did: this.deviceId,
       dc: "desktop",
       sb: "lg",
+      tz: "Europe/Paris",
+      wv: "Google Inc. (NVIDIA)",
+      wr: "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 SUPER Direct3D11 vs_5_0 ps_5_0, D3D11)",
     });
     return `${config.wsUrl}?${params.toString()}`;
   }
@@ -269,7 +272,8 @@ class OmegleBot {
 
   // Search for a partner
   findPartner() {
-    this.send({ type: "search", chatType: config.chatType, bucket: config.bucket });
+    this.seq++;
+    this.send({ type: "find_partner", seq: this.seq, bucket: config.bucket, chatType: config.chatType, prefs: {} });
     this.isSearching = true;
     log("info", `[S${this.sessionId}] Searching for partner...`);
   }
@@ -277,7 +281,8 @@ class OmegleBot {
   // Skip to next partner
   nextPartner() {
     if (this.matchId) activeMatchIds.delete(this.matchId);
-    this.send({ type: "search", chatType: config.chatType, bucket: config.bucket });
+    this.seq++;
+    this.send({ type: "next", seq: this.seq, bucket: config.bucket, chatType: config.chatType, prefs: {} });
     this.matchId = null;
     this.conversationActive = false;
     this.isSearching = true;
