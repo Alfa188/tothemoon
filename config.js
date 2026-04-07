@@ -41,9 +41,10 @@ module.exports = {
   interests: ["chat", "friends", "bored", "talk"],
 
   // Geonode Residential Proxy (credentials from .env)
-  // Docs: https://app.geonode.com/proxies
+  // Proxy config — set PROXY_PROVIDER=iproyal or geonode
   proxy: {
     enabled: envBool("PROXY_ENABLED", true),
+    provider: env("PROXY_PROVIDER", "geonode"),
     host: env("PROXY_HOST", "proxy.geonode.io"),
     port: envInt("PROXY_PORT", 9000),
     username: env("PROXY_USERNAME", ""),

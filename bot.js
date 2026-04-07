@@ -48,19 +48,31 @@ class OmegleBot {
     return `${config.wsUrl}?${params.toString()}`;
   }
 
-  // Build Geonode proxy agent
-  // Format: username-type-TYPE[-country-XX]:password
-  // Note: session/lifetime params are NOT supported by Geonode in the username.
-  // Sticky IPs are not needed since each bot uses a single long-lived WebSocket connection.
+  // Build proxy agent — supports IPRoyal and Geonode via PROXY_PROVIDER env var
+  // IPRoyal: user:pass_country-XX_session-Y_lifetime-Z@geo.iproyal.com:12321
+  // Geonode:  user-type-residential[-country-XX]:pass@proxy.geonode.io:9000
   buildProxyAgent() {
     const p = config.proxy;
     if (!p || !p.enabled) return null;
 
-    let user = `${p.username}-type-${p.type || "residential"}`;
-    if (p.country) user += `-country-${p.country}`;
+    let user, pass;
+    if (p.provider === "iproyal") {
+      user = p.username;
+      pass = p.password;
+      if (p.country) pass += `_country-${p.country}`;
+      if (p.sticky) {
+        const sessId = `bot${this.sessionId}${this.deviceId.slice(0, 6)}`;
+        pass += `_session-${sessId}_lifetime-${p.stickyLifetime || "10m"}`;
+      }
+    } else {
+      // Geonode (default)
+      user = `${p.username}-type-${p.type || "residential"}`;
+      if (p.country) user += `-country-${p.country}`;
+      pass = p.password;
+    }
 
-    const proxyUrl = `http://${encodeURIComponent(user)}:${encodeURIComponent(p.password)}@${p.host}:${p.port}`;
-    log("info", `[S${this.sessionId}] Using proxy: ${p.host}:${p.port}${p.country ? ` (${p.country})` : ""}`);
+    const proxyUrl = `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${p.host}:${p.port}`;
+    log("info", `[S${this.sessionId}] Using proxy: ${p.provider || "geonode"} ${p.host}:${p.port}${p.country ? ` (${p.country})` : ""}`);
     return new HttpsProxyAgent(proxyUrl);
   }
 
