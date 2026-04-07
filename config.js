@@ -38,7 +38,7 @@ module.exports = {
     // lifetime: sticky session duration in minutes (e.g. "10m", "30m")
     country: "",           // Leave empty for random worldwide
     sticky: true,           // Use sticky sessions (same IP per bot session)
-    stickyLifetime: "30m",  // How long to keep the same IP
+    stickyLifetime: "2h",   // How long to keep the same IP
   },
 
   // Logging
