@@ -10,7 +10,7 @@ module.exports = {
   appUrl: "omefree.com",
 
   // Bot behavior
-  maxConcurrentSessions: 50,      // Number of parallel bot sessions
+  maxConcurrentSessions: 30,      // Number of parallel bot sessions
   minDelayBetweenMsgs: 1500,      // Min ms between messages (simulates typing)
   maxDelayBetweenMsgs: 3500,      // Max ms between messages
   typingIndicatorDelay: 800,       // ms to show typing before sending
