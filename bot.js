@@ -41,18 +41,25 @@ class OmegleBot {
     const p = config.proxy;
     if (!p || !p.enabled) return null;
 
-    // IPRoyal uses password suffixes for options
-    // Format: password_country-XX_session-XXXX_lifetime-30m
+    let user = p.username;
     let pass = p.password;
-    if (p.country) pass += `_country-${p.country}`;
-    if (p.sticky) {
-      // Generate a unique session ID per bot instance for sticky IP
-      const sessId = `bot${this.sessionId}_${this.deviceId.slice(0, 8)}`;
-      pass += `_session-${sessId}`;
-      if (p.stickyLifetime) pass += `_lifetime-${p.stickyLifetime}`;
+
+    if (p.provider === "geonode") {
+      // Geonode: options appended to username with dashes
+      // Format: geonode_USERNAME-country-XX
+      if (p.country) user += `-country-${p.country}`;
+    } else {
+      // IPRoyal: options appended to password with underscores
+      // Format: password_country-XX_session-XXXX_lifetime-2h
+      if (p.country) pass += `_country-${p.country}`;
+      if (p.sticky) {
+        const sessId = `bot${this.sessionId}_${this.deviceId.slice(0, 8)}`;
+        pass += `_session-${sessId}`;
+        if (p.stickyLifetime) pass += `_lifetime-${p.stickyLifetime}`;
+      }
     }
 
-    const proxyUrl = `http://${encodeURIComponent(p.username)}:${encodeURIComponent(pass)}@${p.host}:${p.port}`;
+    const proxyUrl = `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${p.host}:${p.port}`;
     log("info", `[S${this.sessionId}] Using proxy: ${p.host}:${p.port}${p.country ? ` (${p.country})` : ""}`);
     return new HttpsProxyAgent(proxyUrl);
   }
