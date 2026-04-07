@@ -28,13 +28,7 @@ module.exports = {
   appUrl: "omefree.com",
 
   // Bot behavior
-  maxConcurrentSessions: envInt("MAX_CONCURRENT_SESSIONS", 30),
-  minDelayBetweenMsgs: 1500,
-  maxDelayBetweenMsgs: 3500,
-  typingIndicatorDelay: 800,
-  waitForResponseMs: 8000,
-  delayBeforePromoMs: 2000,
-  delayBeforeNextMs: 1500,
+  maxConcurrentSessions: envInt("MAX_CONCURRENT_SESSIONS", 1),
   pingIntervalMs: 20000,
 
   // Geonode Residential Proxy (credentials from .env)

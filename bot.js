@@ -299,26 +299,41 @@ class OmegleBot {
     log("info", `[S${this.sessionId}] Skipping to next partner...`);
   }
 
-  // Send a chat message with typing simulation
+  // Send a chat message with human-like typing simulation
   async sendMessage(text) {
     if (!this.matchId || !this.conversationActive) return false;
 
-    // Send typing indicator
+    // Brief pre-typing pause (reading what was said, thinking)
+    await sleep(randomDelay(400, 1800));
+    if (!this.matchId || !this.conversationActive) return false;
+
+    // Start typing indicator
     this.send({ type: "typing", matchId: this.matchId, isTyping: true });
 
-    // Simulate typing time based on message length
-    const typingTime = Math.min(
-      config.typingIndicatorDelay + text.length * 40,
-      4000
-    );
-    await sleep(typingTime);
+    // Human typing speed: ~35-65 WPM = 180-350ms/word, with variation within message
+    const words = text.trim().split(/\s+/).length;
+    const msPerWord = randomDelay(180, 380);
+    let typingMs = words * msPerWord;
+
+    // Add mid-message "thinking" pauses for longer messages
+    if (words > 6) {
+      const extraPauses = Math.floor(words / 6);
+      typingMs += extraPauses * randomDelay(300, 900);
+    }
+
+    // Clamp between 1.2s and 7s
+    typingMs = Math.min(Math.max(typingMs, 1200), 7000);
+    await sleep(typingMs);
 
     if (!this.matchId || !this.conversationActive) return false;
 
     // Stop typing indicator
     this.send({ type: "typing", matchId: this.matchId, isTyping: false });
 
-    // Send the actual message
+    // Tiny pause between stopping typing and sending (feels natural)
+    await sleep(randomDelay(50, 250));
+    if (!this.matchId || !this.conversationActive) return false;
+
     this.send({ type: "chat_message", matchId: this.matchId, text });
     this.stats.messagesDelivered++;
     log("info", `[S${this.sessionId}] You: ${text}`);
@@ -327,50 +342,39 @@ class OmegleBot {
 
   // Run a conversation sequence
   async runConversation() {
-    const sequence = getRandomSequence();
+    const [greeting, promo] = getRandomSequence();
 
-    // Wait 3 seconds after match before sending anything
-    await sleep(3000);
+    // Variable initial reaction delay (human takes a moment to notice the match)
+    await sleep(randomDelay(1500, 4500));
     if (!this.matchId || !this.conversationActive) return;
 
-    for (let i = 0; i < sequence.length; i++) {
-      if (!this.matchId || !this.conversationActive) {
-        log("info", `[S${this.sessionId}] Partner left mid-conversation`);
-        return;
-      }
+    // Send greeting
+    const greetSent = await this.sendMessage(greeting);
+    if (!greetSent) return;
 
-      // Random delay between messages
-      if (i > 0) {
-        const delay = randomDelay(config.minDelayBetweenMsgs, config.maxDelayBetweenMsgs);
-        await sleep(delay);
-      }
+    // Wait for stranger's response — wide variable window like a real person
+    this.strangerReplied = false;
+    const responseWait = randomDelay(6000, 16000);
+    await sleep(responseWait);
+    if (!this.matchId || !this.conversationActive) return;
 
-      // Check again after delay
-      if (!this.matchId || !this.conversationActive) return;
-
-      const sent = await this.sendMessage(sequence[i]);
-      if (!sent) return;
-
-      // After the first message (greeting), wait for a response
-      if (i === 0) {
-        this.strangerReplied = false;
-        await sleep(config.waitForResponseMs);
-        if (!this.matchId || !this.conversationActive) return;
-        // If stranger replied, add a natural extra pause before promo
-        if (this.strangerReplied) {
-          await sleep(randomDelay(config.delayBeforePromoMs, config.delayBeforePromoMs + 2000));
-          if (!this.matchId || !this.conversationActive) return;
-        }
-      }
-    }
-
-    // Linger a bit if stranger was engaged
+    // If they replied, pause to "read" their message before responding
     if (this.strangerReplied) {
-      await sleep(randomDelay(3000, 5000));
+      await sleep(randomDelay(1200, 3500));
+      if (!this.matchId || !this.conversationActive) return;
     }
 
-    // Conversation done, wait a moment then move to next
-    await sleep(config.delayBeforeNextMs);
+    // Send promo
+    const promoSent = await this.sendMessage(promo);
+    if (!promoSent) return;
+
+    // Linger naturally if they were engaged
+    if (this.strangerReplied) {
+      await sleep(randomDelay(4000, 9000));
+    }
+
+    // Brief pause before skipping
+    await sleep(randomDelay(800, 2000));
     if (this.matchId && this.conversationActive) {
       this.nextPartner();
     }
