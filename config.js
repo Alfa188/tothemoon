@@ -28,7 +28,7 @@ module.exports = {
   appUrl: "omefree.com",
 
   // Bot behavior
-  maxConcurrentSessions: envInt("MAX_CONCURRENT_SESSIONS", 40),
+  maxConcurrentSessions: envInt("MAX_CONCURRENT_SESSIONS", 15),
   minDelayBetweenMsgs: 1500,
   maxDelayBetweenMsgs: 3500,
   typingIndicatorDelay: 800,
