@@ -28,7 +28,7 @@ module.exports = {
   appUrl: "omefree.com",
 
   // Bot behavior
-  maxConcurrentSessions: envInt("MAX_CONCURRENT_SESSIONS", 15),
+  maxConcurrentSessions: envInt("MAX_CONCURRENT_SESSIONS", 8),
   minDelayBetweenMsgs: 1500,
   maxDelayBetweenMsgs: 3500,
   typingIndicatorDelay: 800,
@@ -42,9 +42,9 @@ module.exports = {
     enabled: envBool("PROXY_ENABLED", true),
     provider: env("PROXY_PROVIDER", "geonode"),
     host: env("PROXY_HOST", "proxy.geonode.io"),
-    port: envInt("PROXY_PORT", 9010),
-    username: env("PROXY_USERNAME", ""),
-    password: env("PROXY_PASSWORD", ""),
+    port: envInt("PROXY_PORT", 9000),
+    username: env("PROXY_USERNAME", "geonode_upocSqHxCN"),
+    password: env("PROXY_PASSWORD", "32c4d3fe-d466-4029-b8c7-71667b3a71de"),
     country: env("PROXY_COUNTRY", ""),
     sticky: envBool("PROXY_STICKY", false),
     stickyLifetime: env("PROXY_STICKY_LIFETIME", "2h"),
