@@ -26,9 +26,10 @@ async function main() {
     const bot = new OmegleBot(i + 1);
     bots.push(bot);
 
-    // Stagger launches to prevent bot-to-bot cascade at startup
+    // Stagger launches with random delay to prevent bot-to-bot synchronization
     if (i > 0) {
-      await new Promise((r) => setTimeout(r, 3000));
+      const stagger = 3000 + Math.random() * 7000; // 3-10s random per bot
+      await new Promise((r) => setTimeout(r, stagger));
     }
 
     // Run each bot (non-blocking)

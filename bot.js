@@ -358,8 +358,9 @@ class OmegleBot {
   async reconnect() {
     this.reconnectAttempts++;
 
-    // Use vpn-specific backoff if we got vpn_blocked, otherwise normal backoff
-    const backoff = this._vpnBackoff || Math.min(5000 * this.reconnectAttempts, 30000);
+    // Use vpn-specific backoff if we got vpn_blocked, otherwise randomized backoff to desync bots
+    const baseBackoff = Math.min(5000 * this.reconnectAttempts, 30000);
+    const backoff = this._vpnBackoff || (baseBackoff + Math.random() * 8000);
     this._vpnBackoff = null;
 
     log("info", `[S${this.sessionId}] Reconnecting in ${Math.round(backoff / 1000)}s (attempt ${this.reconnectAttempts})...`);
