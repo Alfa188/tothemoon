@@ -346,8 +346,9 @@ class OmegleBot {
       }
     }
 
-    // Conversation done, wait a moment then move to next
-    await sleep(config.delayBeforeNextMs);
+    // Conversation done, wait a random delay to desync bots from each other
+    const nextDelay = randomDelay(config.delayBeforeNextMs, config.delayBeforeNextMaxMs);
+    await sleep(nextDelay);
     if (this.matchId && this.conversationActive) {
       this.nextPartner();
     }

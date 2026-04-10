@@ -34,7 +34,8 @@ module.exports = {
   typingIndicatorDelay: 800,
   waitForResponseMs: 8000,
   delayBeforePromoMs: 2000,
-  delayBeforeNextMs: 1500,
+  delayBeforeNextMs: envInt("DELAY_BEFORE_NEXT_MS", 8000),
+  delayBeforeNextMaxMs: envInt("DELAY_BEFORE_NEXT_MAX_MS", 25000),
   pingIntervalMs: 20000,
 
   // Proxy configuration (iproyal or geonode)
