@@ -28,7 +28,7 @@ module.exports = {
   appUrl: "omefree.com",
 
   // Bot behavior
-  maxConcurrentSessions: envInt("MAX_CONCURRENT_SESSIONS", 8),
+  maxConcurrentSessions: 28,
   minDelayBetweenMsgs: 1500,
   maxDelayBetweenMsgs: 3500,
   typingIndicatorDelay: 800,
@@ -40,7 +40,7 @@ module.exports = {
 
   // Proxy configuration (iproyal or geonode)
   proxy: {
-    enabled: envBool("PROXY_ENABLED", true),
+    enabled: envBool("PROXY_ENABLED", false),
     provider: env("PROXY_PROVIDER", "geonode"),
     host: env("PROXY_HOST", "proxy.geonode.io"),
     port: envInt("PROXY_PORT", 9000),
