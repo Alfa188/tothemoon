@@ -29,8 +29,8 @@ module.exports = {
 
   // Bot behavior
   maxConcurrentSessions: 28,
-  minDelayBetweenMsgs: 1500,
-  maxDelayBetweenMsgs: 3500,
+  minDelayBetweenMsgs: 4000,
+  maxDelayBetweenMsgs: 7000,
   typingIndicatorDelay: 800,
   waitForResponseMs: 8000,
   delayBeforePromoMs: 2000,

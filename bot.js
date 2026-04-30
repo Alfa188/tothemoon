@@ -1,7 +1,7 @@
 const WebSocket = require("ws");
 const { HttpsProxyAgent } = require("https-proxy-agent");
 const config = require("./config");
-const { getRandomSequence } = require("./messages");
+const { getGreeting, getAgeMessage, getPromoMessage } = require("./messages");
 const { generateDeviceId, randomDelay, sleep, log } = require("./utils");
 
 // Shared registry of active matchIds across all bot instances
@@ -315,36 +315,24 @@ class OmegleBot {
 
   // Run a conversation sequence
   async runConversation() {
-    const sequence = getRandomSequence();
-
-    // Wait 3 seconds after match before sending anything
+    // Wait a moment after match before sending anything
     await sleep(3000);
     if (!this.matchId || !this.conversationActive) return;
 
-    for (let i = 0; i < sequence.length; i++) {
-      if (!this.matchId || !this.conversationActive) {
-        log("info", `[S${this.sessionId}] Partner left mid-conversation`);
-        return;
-      }
+    // --- Phase 1: send "f" or "F" ---
+    if (!await this.sendMessage(getGreeting())) return;
 
-      // Random delay between messages
-      if (i > 0) {
-        const delay = randomDelay(config.minDelayBetweenMsgs, config.maxDelayBetweenMsgs);
-        await sleep(delay);
-      }
+    // --- Phase 2: send age declaration ---
+    await sleep(randomDelay(config.minDelayBetweenMsgs, config.maxDelayBetweenMsgs));
+    if (!this.matchId || !this.conversationActive) return;
+    if (!await this.sendMessage(getAgeMessage())) return;
 
-      // Check again after delay
-      if (!this.matchId || !this.conversationActive) return;
-
-      const sent = await this.sendMessage(sequence[i]);
-      if (!sent) return;
-
-      // After the first message, wait a bit for a response
-      if (i === 0) {
-        await sleep(config.waitForResponseMs);
-        if (!this.matchId || !this.conversationActive) return;
-      }
-    }
+    // --- Phase 3: send promo message ---
+    await sleep(randomDelay(config.minDelayBetweenMsgs, config.maxDelayBetweenMsgs));
+    if (!this.matchId || !this.conversationActive) return;
+    const promo = getPromoMessage();
+    log("info", `[S${this.sessionId}] Sending promo: ${promo}`);
+    await this.sendMessage(promo);
 
     // Conversation done, wait a random delay to desync bots from each other
     const nextDelay = randomDelay(config.delayBeforeNextMs, config.delayBeforeNextMaxMs);
